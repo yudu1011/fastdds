@@ -111,11 +111,11 @@ public:
 
         std::string first_argument = argv[1];
 
-        if (first_argument == "publisher" )
+        if (first_argument == "publisher" || first_argument == "pub"|| first_argument =="PUB" || first_argument == "Pub")
         {
             config.entity = CLIParser::EntityKind::PUBLISHER;
         }
-        else if (first_argument == "subscriber")
+        else if (first_argument == "subscriber" || first_argument == "sub" || first_argument =="SUB" || first_argument == "Sub")
         {
             config.entity = CLIParser::EntityKind::SUBSCRIBER;
         }
