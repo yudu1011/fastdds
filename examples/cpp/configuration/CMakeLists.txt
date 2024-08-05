@@ -15,7 +15,7 @@
 cmake_minimum_required(VERSION 3.20)
 
 project(fastdds_configuration_example VERSION 1 LANGUAGES CXX)
-
+# set(CMAKE_PREFIX_PATH "${CMAKE_PREFIX_PATH};/home/byd/Fast-DDS/install")
 # Find requirements
 if(NOT fastcdr_FOUND)
     find_package(fastcdr 2 REQUIRED)
@@ -25,17 +25,18 @@ if(NOT fastdds_FOUND)
     find_package(fastdds 3 REQUIRED)
 endif()
 
-#Check C++11
-include(CheckCXXCompilerFlag)
-if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    check_cxx_compiler_flag(-std=c++11 SUPPORTS_CXX11)
-    check_cxx_compiler_flag(-std=c++11 SUPPORTS_CXX11)
-    if(NOT SUPPORTS_CXX11)
-        message(FATAL_ERROR "Compiler doesn't support C++11")
-    endif()
-endif()
+# #Check C++11
+# include(CheckCXXCompilerFlag)
+# if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+#     check_cxx_compiler_flag(-std=c++11 SUPPORTS_CXX11)
+#     check_cxx_compiler_flag(-std=c++11 SUPPORTS_CXX11)
+#     if(NOT SUPPORTS_CXX11)
+#         message(FATAL_ERROR "Compiler doesn't support C++11")
+#     endif()
+# endif()
 
 message(STATUS "Configuring configuration example...")
+
 file(GLOB CONFIGURATION_SOURCES_CXX "*.cxx")
 file(GLOB CONFIGURATION_SOURCES_CPP "*.cpp")
 
@@ -50,17 +51,17 @@ target_link_libraries(configuration fastdds fastcdr)
 install(TARGETS configuration
     RUNTIME DESTINATION ${DATA_INSTALL_DIR}/fastdds/examples/cpp/configuration/${BIN_INSTALL_DIR})
 
-# Copy the XML files over to the build directory
-file(GLOB_RECURSE XML_FILES ${CMAKE_CURRENT_SOURCE_DIR}/*.xml)
-# for each xml file detected
-foreach(XML_FILE_COMPLETE_PATH ${XML_FILES})
-    # obtain the file name
-    get_filename_component(XML_FILE ${XML_FILE_COMPLETE_PATH} NAME_WE)
-    # copy the file from src to build folders
-    configure_file(
-        ${XML_FILE_COMPLETE_PATH}                   # from full src path
-        ${CMAKE_CURRENT_BINARY_DIR}/${XML_FILE}.xml # to relative build path
-        COPYONLY)
-    install(FILES ${XML_FILE_COMPLETE_PATH}
-        DESTINATION ${DATA_INSTALL_DIR}/fastdds/examples/cpp/configuration/${BIN_INSTALL_DIR})
-endforeach()
+# # Copy the XML files over to the build directory
+# file(GLOB_RECURSE XML_FILES ${CMAKE_CURRENT_SOURCE_DIR}/*.xml)
+# # for each xml file detected
+# foreach(XML_FILE_COMPLETE_PATH ${XML_FILES})
+#     # obtain the file name
+#     get_filename_component(XML_FILE ${XML_FILE_COMPLETE_PATH} NAME_WE)
+#     # copy the file from src to build folders
+#     configure_file(
+#         ${XML_FILE_COMPLETE_PATH}                   # from full src path
+#         ${CMAKE_CURRENT_BINARY_DIR}/${XML_FILE}.xml # to relative build path
+#         COPYONLY)
+#     install(FILES ${XML_FILE_COMPLETE_PATH}
+#         DESTINATION ${DATA_INSTALL_DIR}/fastdds/examples/cpp/configuration/${BIN_INSTALL_DIR})
+# endforeach()

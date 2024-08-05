@@ -22,7 +22,7 @@
 
 
 #include <condition_variable>
-
+#include <random>
 #include <fastdds/dds/domain/DomainParticipant.hpp>
 #include <fastdds/dds/publisher/DataWriterListener.hpp>
 #include <fastdds/dds/topic/TypeSupport.hpp>
@@ -85,6 +85,8 @@ private:
 
     //! Publish a sample
     bool publish();
+    
+    void writeData();
 
     Configuration configuration_;
 
@@ -107,7 +109,11 @@ private:
     uint32_t period_ms_;
 
     uint16_t samples_;
+    
+    uint32_t msg_size;
 
+    std::mt19937 generator_;
+    std::uniform_int_distribution<int> distribution_;      
     std::atomic<bool> stop_;
 
     int16_t wait_;

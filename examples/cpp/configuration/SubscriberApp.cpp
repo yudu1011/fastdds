@@ -21,6 +21,7 @@
 
 #include <condition_variable>
 #include <stdexcept>
+// #include <thread>
 
 #include <fastdds/dds/core/status/SubscriptionMatchedStatus.hpp>
 #include <fastdds/dds/domain/DomainParticipantFactory.hpp>
@@ -53,13 +54,18 @@ SubscriberApp::SubscriberApp(
     , reader_(nullptr)
     , type_(new ConfigurationPubSubType())
     , received_samples_(0)
+    , losted_samples_(0)
     , samples_(config.samples)
 {
     // Create the participant
     DomainParticipantQos pqos = PARTICIPANT_QOS_DEFAULT;
     pqos.name("Configuration_sub_participant");
     auto factory = DomainParticipantFactory::get_instance();
-    if (config.profile_participant.empty())
+        if ( !RETCODE_OK == factory->load_XML_profiles_file("configuration_profile.xml"))
+    {
+        throw std::runtime_error("xml load failed");
+    }
+        if (config.profile_participant.empty())
     {
         // Include Participant QoS
         pqos.setup_transports(config.transport);
@@ -196,9 +202,9 @@ void SubscriberApp::on_data_available(
         if ((info.instance_state == ALIVE_INSTANCE_STATE) && info.valid_data)
         {
             received_samples_++;
-            std::cout << "Sample: '" << configuration_.message().data() << "' with index: '" <<
-                configuration_.index() << "' (" << static_cast<int>(configuration_.data().size()) <<
-                " Bytes) RECEIVED" << std::endl;
+            // std::cout << "Sample: '" << configuration_.message().data() << "' with index: '" <<
+            //     configuration_.index() << "' (" << static_cast<int>(configuration_.data().size()) <<
+            //     " Bytes) RECEIVED  " << static_cast<int>(losted_samples_) << " samples losted " <<std::endl;
             if ((samples_ > 0) && (received_samples_ >= samples_))
             {
                 stop();
@@ -239,16 +245,40 @@ void SubscriberApp::on_sample_lost(
         DataReader* /*reader*/,
         const SampleLostStatus& /*status*/)
 {
-    std::cout << "Sample lost!" << std::endl;
+    // std::cout << "Sample lost!" << std::endl;
+    losted_samples_ ++;
 }
 
 void SubscriberApp::run()
-{
+{   
+    std::thread t_modify([=]() { this->ptf(); });
+    t_modify.detach();
+
     std::unique_lock<std::mutex> lock_(mutex_);
     cv_.wait(lock_, [&]
             {
                 return is_stopped();
             });
+}
+
+void SubscriberApp::ptf() 
+{
+    while (true) 
+    {
+        // function_to_call();
+        if (received_samples_ > 0)
+        {
+            std::cout << "Sample: '" << configuration_.message().data() << "' with index: '" <<
+                configuration_.index() << "' (" << static_cast<int>(configuration_.data().size()) <<
+                " Bytes) RECEIVED  " << static_cast<int>(losted_samples_) << " samples losted " <<std::endl;
+        }
+        // std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        std::unique_lock<std::mutex> terminate_lock(mutex_);
+        cv_.wait_for(terminate_lock, std::chrono::milliseconds(1000), [&]()
+                {
+                    return is_stopped();
+                });
+    }
 }
 
 bool SubscriberApp::is_stopped()
@@ -258,6 +288,10 @@ bool SubscriberApp::is_stopped()
 
 void SubscriberApp::stop()
 {
+    std::cout << static_cast<int>(received_samples_) << " Samples Recived ," << static_cast<int>(losted_samples_) << " Samples Losted" << std::endl;
+    std::cout << "Lost Samples Rate: "<< static_cast<float>( (received_samples_ == 0) ? 
+        0.0 : 100 * float(losted_samples_) /float(received_samples_ + losted_samples_)) << "%" << std::endl;
+
     stop_.store(true);
     cv_.notify_all();
 }

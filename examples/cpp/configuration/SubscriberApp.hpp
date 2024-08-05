@@ -89,6 +89,7 @@ public:
 
     //! Trigger the end of execution
     void stop() override;
+	void ptf();
 
 private:
 
@@ -113,8 +114,10 @@ private:
 
     uint32_t received_samples_;
 
+	uint32_t losted_samples_;
+	
     uint32_t samples_;
-
+	
     std::atomic<bool> stop_;
 };
 

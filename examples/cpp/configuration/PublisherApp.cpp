@@ -18,7 +18,7 @@
  */
 
 #include "PublisherApp.hpp"
-
+#include <random>
 #include <algorithm>
 #include <condition_variable>
 #include <csignal>
@@ -57,16 +57,23 @@ PublisherApp::PublisherApp(
     , samples_(config.samples)
     , stop_(false)
     , wait_(config.wait)
-{
+{   // Creat a generator
+    std::random_device rd;
+    std::mt19937 generator_(rd());
+    std::uniform_int_distribution<int> distribution_(0, 0xFF); // 从0到255的整数
     // Set up the data type with initial values
     configuration_.index(0);
     memcpy(configuration_.message().data(), "Configuration", strlen("Configuration") + 1);
     configuration_.data(std::vector<uint8_t>(config.msg_size, 0xAA));
-
+    msg_size = config.msg_size;
     // Create the participant
     DomainParticipantQos pqos = PARTICIPANT_QOS_DEFAULT;
     pqos.name("Configuration_pub_participant");
     auto factory = DomainParticipantFactory::get_instance();
+    if ( !RETCODE_OK == factory->load_XML_profiles_file("configuration_profile.xml"))
+    {
+        throw std::runtime_error("xml load failed");
+    }
     if (config.profile_participant.empty())
     {
         // Include Participant QoS
@@ -250,7 +257,7 @@ void PublisherApp::run()
         {
             std::cout << "Sample: '" << configuration_.message().data() << "' with index: '"
                       << configuration_.index() << "' (" << static_cast<int>(configuration_.data().size())
-                      << " Bytes) SENT" << std::endl;
+                      << " Bytes) SENT " << " Head:" << static_cast<int>(configuration_.data()[0]) << std::endl;
         }
         // Wait for period or stop event
         std::unique_lock<std::mutex> terminate_lock(mutex_);
@@ -264,6 +271,7 @@ void PublisherApp::run()
 bool PublisherApp::publish()
 {
     bool ret = false;
+    writeData();
     // Wait for the data endpoints discovery
     std::unique_lock<std::mutex> matched_lock(mutex_);
     cv_.wait(matched_lock, [&]()
@@ -290,6 +298,17 @@ void PublisherApp::stop()
     cv_.notify_one();
 }
 
+void PublisherApp::writeData()
+{   
+    std::vector<uint8_t> data_(msg_size, 0);
+    uint8_t rm_number = distribution_(generator_);
+    for (uint32_t i =0; i < msg_size; i++){
+        data_[i] = rm_number;
+        rm_number = distribution_(generator_);
+    }
+    
+    configuration_.data(data_);
+}
 } // namespace configuration
 } // namespace examples
 } // namespace fastdds
