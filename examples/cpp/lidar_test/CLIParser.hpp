@@ -21,13 +21,13 @@
 #include <fastdds/rtps/attributes/BuiltinTransports.hpp>
 #include <fastdds/dds/core/policy/QosPolicies.hpp>
 
-#ifndef FASTDDS_EXAMPLES_CPP_CONFIGURATION__CLIPARSER_HPP
-#define FASTDDS_EXAMPLES_CPP_CONFIGURATION__CLIPARSER_HPP
+#ifndef FASTDDS_EXAMPLES_CPP_LIDAR_TEST__CLIPARSER_HPP
+#define FASTDDS_EXAMPLES_CPP_LIDAR_TEST__CLIPARSER_HPP
 
 namespace eprosima {
 namespace fastdds {
 namespace examples {
-namespace configuration {
+namespace lidartest {
 
 using namespace eprosima::fastdds::dds;
 using dds::Log;
@@ -1192,4 +1192,4 @@ public:
 } // namespace fastdds
 } // namespace eprosima
 
-#endif // FASTDDS_EXAMPLES_CPP_CONFIGURATION__CLIPARSER_HPP
+#endif 

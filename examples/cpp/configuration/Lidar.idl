@@ -1,60 +1,58 @@
-module Lidar
+@final
+struct Header
 {
-    @final
-    struct Header
-    {
-        UInt32 seq;
-        UInt32 timestamp_sec;
-        UInt32 timestamp_usec;
-        UInt32 utc_timestamp_sec;
-        UInt8 topic[64];
-        UInt32 cycle_time;
-    };
-    @final
-    struct Suffix
-    {
-        UInt8 suff[64];
-    };
-    @final
-    struct ChannelData
-    {
-        Float x;
-        Float y;
-        Float z;
-        UInt8 intensity;
-    };
-    @final
-    struct DataBlock
-    {
-        UInt8 time_offset;
-        UInt8 return_seq;
-        UInt16 channel_data_sum;            //一个block有5个channel_data
-        ChannelData channel_data_list[5];
-    };
-    @final
-    struct Packet
-    {
-        UInt32 timestamp_sec;
-        UInt32 timestamp_usec;
-        UInt8 laser_num;
-        UInt16 data_block_sum;  
-        DataBlock data_block_list[25];
-    };
-    @final
-    struct LidarDataDet 
-    {
-        UInt16 protocol_version;
-        UInt8 return_mode;
-        UInt8 time_sync_mode;
-        UInt8 frame_sync;
-        UInt16 packet_sum;
-        Packet packet_list[630];
-    };
-    @final
-    struct LidarDataDetection
-    {
-        Header header;
-        LidarDataDet lidardatadet;
-        Suffix suffix;
-    };
+    UInt32 seq;
+    UInt32 timestamp_sec;
+    UInt32 timestamp_usec;
+    UInt32 utc_timestamp_sec;
+    UInt8 topic[64];
+    UInt32 cycle_time;
 };
+@final
+struct Suffix
+{
+    UInt8 suff[64];
+};
+@final
+struct ChannelData
+{
+    Float x;
+    Float y;
+    Float z;
+    UInt8 intensity;
+};
+@final
+struct DataBlock
+{
+    UInt8 time_offset;
+    UInt8 return_seq;
+    UInt16 channel_data_sum;            //一个block有5个channel_data
+    ChannelData channel_data_list[5];
+};
+@final
+struct Packet
+{
+    UInt32 timestamp_sec;
+    UInt32 timestamp_usec;
+    UInt8 laser_num;
+    UInt16 data_block_sum;  
+    DataBlock data_block_list[25];
+};
+@final
+struct LidarDataDet 
+{
+    UInt16 protocol_version;
+    UInt8 return_mode;
+    UInt8 time_sync_mode;
+    UInt8 frame_sync;
+    UInt16 packet_sum;
+    Packet packet_list[630];
+};
+@final
+struct LidarDataDetection
+{
+    Header header;
+    LidarDataDet lidardatadet;
+    Suffix suffix;
+};
+

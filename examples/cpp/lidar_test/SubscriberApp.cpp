@@ -1,17 +1,3 @@
-// Copyright 2024 Proyectos y Sistemas de Mantenimiento SL (eProsima).
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 /**
  * @file SubscriberApp.cpp
  *
@@ -22,6 +8,7 @@
 #include <condition_variable>
 #include <stdexcept>
 #include <thread>
+#include <sys/time.h>
 
 #include <fastdds/dds/core/status/SubscriptionMatchedStatus.hpp>
 #include <fastdds/dds/domain/DomainParticipantFactory.hpp>
@@ -36,7 +23,7 @@
 
 #include "Application.hpp"
 #include "CLIParser.hpp"
-#include "ConfigurationPubSubTypes.hpp"
+#include "lidardataPubSubTypes.hpp"
 
 using namespace eprosima::fastdds::dds;
 using namespace eprosima::fastdds::rtps;
@@ -44,7 +31,7 @@ using namespace eprosima::fastdds::rtps;
 namespace eprosima {
 namespace fastdds {
 namespace examples {
-namespace configuration {
+namespace lidartest {
 
 SubscriberApp::SubscriberApp(
         const CLIParser::subscriber_config& config)
@@ -52,16 +39,17 @@ SubscriberApp::SubscriberApp(
     , subscriber_(nullptr)
     , topic_(nullptr)
     , reader_(nullptr)
-    , type_(new ConfigurationPubSubType())
+    , type_(new LidarDataDetectionPubSubType())
     , received_samples_(0)
     , losted_samples_(0)
     , samples_(config.samples)
 {
     // Create the participant
+    gettimeofday(&starttime_,NULL);
     DomainParticipantQos pqos = PARTICIPANT_QOS_DEFAULT;
     pqos.name("Configuration_sub_participant");
     auto factory = DomainParticipantFactory::get_instance();
-        if ( !RETCODE_OK == factory->load_XML_profiles_file("configuration_profile.xml"))
+        if ( !RETCODE_OK == factory->load_XML_profiles_file("lidartest_profile.xml"))
     {
         throw std::runtime_error("xml load failed");
     }
@@ -197,12 +185,12 @@ void SubscriberApp::on_data_available(
         DataReader* reader)
 {
     SampleInfo info;
-    while ((!is_stopped()) && (RETCODE_OK == reader->take_next_sample(&configuration_, &info)))
+    while ((!is_stopped()) && (RETCODE_OK == reader->take_next_sample(&lidar_data_, &info)))
     {
         if ((info.instance_state == ALIVE_INSTANCE_STATE) && info.valid_data)
         {
             received_samples_++;
-            // std::cout << "get sample" << received_samples_ << std::endl;
+            std::cout << "get sample" << received_samples_ << "; size: " << static_cast<int>(sizeof(lidar_data_))<< "Bytes)"<<std::endl;
             // std::cout << "Sample: '" << configuration_.message().data() << "' with index: '" <<
             //     configuration_.index() << "' (" << static_cast<int>(configuration_.data().size()) <<
             //     " Bytes) RECEIVED  " << static_cast<int>(losted_samples_) << " samples losted " <<std::endl;
@@ -268,9 +256,9 @@ void SubscriberApp::ptf()
     {
         if (received_samples_ > 0)
         {
-            std::cout << "Sample: '" << configuration_.message().data() << "' with index: '" <<
-                configuration_.index() << "' (" << static_cast<int>(configuration_.data().size()) <<
-                " Bytes) RECEIVED  " << static_cast<int>(losted_samples_) << " samples losted " <<std::endl;
+            // std::cout << "Sample: '" << lidar_data_.message().data() << "' with index: '" <<
+            //     lidar_data_.index() << "' (" << static_cast<int>(lidar_data_.data().size()) <<
+            //     " Bytes) RECEIVED  " << static_cast<int>(losted_samples_) << " samples losted " <<std::endl;
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         // std::unique_lock<std::mutex> terminate_lock(mutex_);
@@ -287,16 +275,20 @@ bool SubscriberApp::is_stopped()
 }
 
 void SubscriberApp::stop()
-{
-    std::cout << static_cast<int>(received_samples_) << " Samples Recived ," << static_cast<int>(losted_samples_) << " Samples Losted" << std::endl;
-    std::cout << "Lost Samples Rate: "<< static_cast<float>( (received_samples_ == 0) ? 
-        0.0 : 100 * float(losted_samples_) /float(received_samples_ + losted_samples_)) << "%" << std::endl;
+{   
+    gettimeofday(&nowtime_,NULL);
+    uint64_t cyclonetime = (nowtime_.tv_sec - starttime_.tv_sec) * 1000000 + (nowtime_.tv_usec - starttime_.tv_usec);
+
+    std::cout << static_cast<int>(received_samples_) << " Samples Recived ," << static_cast<int>(losted_samples_) << " Samples Losted; " 
+    << "Lost Samples Rate: "<< static_cast<float>( (received_samples_ == 0) ? 
+        0.0 : 100 * float(losted_samples_) /float(received_samples_ + losted_samples_)) << "%  " << "Transfer Speed: " 
+    << static_cast<float>(float(received_samples_) / float(cyclonetime / 1000000)) << "samples/s" << std::endl;
 
     stop_.store(true);
     cv_.notify_all();
 }
 
-} // namespace configuration
+} // namespace lidartest
 } // namespace examples
 } // namespace fastdds
 } // namespace eprosima

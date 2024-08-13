@@ -17,8 +17,9 @@
  *
  */
 
-#ifndef FASTDDS_EXAMPLES_CPP_CONFIGURATION__SUBSCRIBERAPP_HPP
-#define FASTDDS_EXAMPLES_CPP_CONFIGURATION__SUBSCRIBERAPP_HPP
+#ifndef FASTDDS_EXAMPLES_CPP_LIDAR_TEST__SUBSCRIBERAPP_HPP
+#define FASTDDS_EXAMPLES_CPP_LIDAR_TEST__SUBSCRIBERAPP_HPP
+
 
 #include <atomic>
 #include <condition_variable>
@@ -32,14 +33,15 @@
 
 #include "Application.hpp"
 #include "CLIParser.hpp"
-#include "Configuration.hpp"
+#include "lidardata.hpp"
 
 using namespace eprosima::fastdds::dds;
+using namespace Lidar;
 
 namespace eprosima {
 namespace fastdds {
 namespace examples {
-namespace configuration {
+namespace lidartest {
 
 class SubscriberApp : public Application,  public DataReaderListener
 {
@@ -96,8 +98,17 @@ private:
     //! Return the current state of execution
     bool is_stopped();
 
-    Configuration configuration_;
+    LidarDataDetection lidar_data_;
+    timeval nowtime_;
+    timeval starttime_;
+//     Header headers_;
+//     LidarDataDet lidardatadets_;
+//     // Suffix suffix_;
 
+//     Packet packets_[630];
+//     DataBlock datablocks_[25];
+//     ChannelData chaneldatas_[5];
+    
     DomainParticipant* participant_;
 
     Subscriber* subscriber_;

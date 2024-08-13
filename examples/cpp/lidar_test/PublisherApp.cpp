@@ -24,6 +24,8 @@
 #include <csignal>
 #include <stdexcept>
 #include <thread>
+#include <sys/time.h>
+#include <cmath>
 
 #include <fastdds/dds/domain/DomainParticipantFactory.hpp>
 #include <fastdds/dds/log/Log.hpp>
@@ -34,16 +36,16 @@
 #include <fastdds/rtps/transport/shared_mem/SharedMemTransportDescriptor.hpp>
 #include <fastdds/rtps/transport/UDPv4TransportDescriptor.hpp>
 #include <fastdds/rtps/transport/UDPv6TransportDescriptor.hpp>
+#include "lidardataPubSubTypes.hpp"
 
-#include "ConfigurationPubSubTypes.hpp"
-
+// #include <fastdds/dds/core/Time.hpp>
 using namespace eprosima::fastdds::dds;
 using namespace eprosima::fastdds::rtps;
 
 namespace eprosima {
 namespace fastdds {
 namespace examples {
-namespace configuration {
+namespace lidartest {
 
 PublisherApp::PublisherApp(
         const CLIParser::publisher_config& config)
@@ -51,38 +53,37 @@ PublisherApp::PublisherApp(
     , publisher_(nullptr)
     , topic_(nullptr)
     , writer_(nullptr)
-    , type_(new ConfigurationPubSubType())
+    , type_(new LidarDataDetectionPubSubType())
     , matched_(0)
     , period_ms_(config.interval)
     , samples_(config.samples)
     , stop_(false)
     , wait_(config.wait)
-    // , udpreciver_("224.0.2.3", 51213)
     , udpreciver_(config.groupIP, config.port)
 {   
+
     // Creat a generator
 
     // udpreciver_ = UdpReciver("224.0.2.3", 51213);
-    
-    std::random_device rd;
-    std::mt19937 generator_(rd());
-    std::uniform_int_distribution<int> distribution_(0, 0xFF); // 从0到255的整数
+    // std::random_device rd;
+    // std::mt19937 generator_(rd());
+    // std::uniform_int_distribution<int> distribution_(0, 0xFF); // 从0到255的整数
     // Set up the data type with initial values
-    configuration_.index(0);
-    memcpy(configuration_.message().data(), "Configuration", strlen("Configuration") + 1);
-    msg_size = config.msg_size;
+    // configuration_.index(0);
+    // memcpy(configuration_.message().data(), "Configuration", strlen("Configuration") + 1);
+    // msg_size = config.msg_size;
 
-    configuration_.data(std::vector<uint8_t>(msg_size, 0xAA));
+    // configuration_.data(std::vector<uint8_t>(msg_size, 0xAA));
 
-    buffer_[msg_size];
+    // buffer_[msg_size];
 
     // std::cout << sizeof(&buffer_);
-
+    gettimeofday(&starttime_,nullptr);
     // Create the participant
     DomainParticipantQos pqos = PARTICIPANT_QOS_DEFAULT;
     pqos.name("Configuration_pub_participant");
     auto factory = DomainParticipantFactory::get_instance();
-    if ( !RETCODE_OK == factory->load_XML_profiles_file("configuration_profile.xml"))
+    if ( !RETCODE_OK == factory->load_XML_profiles_file("lidartest_profile.xml"))
     {
         throw std::runtime_error("xml load failed");
     }
@@ -263,43 +264,176 @@ void PublisherApp::on_unacknowledged_sample_removed(
 
 void PublisherApp::run()
 {
-    while (!is_stopped() && ((samples_ == 0) || (configuration_.index() < samples_)))
+    packet_sum_ = 0;
+
+    std::thread udprecive([&]() {this->udprun();});
+    udprecive.detach();
+
+    while (!is_stopped() && ((samples_ == 0)))
     {
+        // printf("running\n");
         if (publish())
-        {
-            std::cout << "Sample: '" << configuration_.message().data() << "' with index: '"
-                      << configuration_.index() << "' (" << static_cast<int>(configuration_.data().size())
-                      << " Bytes) SENT " << " Head:" << static_cast<int>(configuration_.data()[0]) << std::endl;
+        {   
+            std::cout  << static_cast<int>(sizeof(lidar_data_)) << " Bytes) SENT " << "Packet sum: " << lidar_data_.lidardatadet_().packet_sum() <<std::endl;
         }
         // Wait for period or stop event
-        std::unique_lock<std::mutex> terminate_lock(mutex_);
-        cv_.wait_for(terminate_lock, std::chrono::milliseconds(period_ms_), [&]()
-                {
-                    return is_stopped();
-                });
+        // std::unique_lock<std::mutex> terminate_lock(mutex_);
+        // cv_.wait_for(terminate_lock, std::chrono::milliseconds(period_ms_), [&]()
+        //     {
+        //         return is_stopped();
+        //     });
     }
 }
 
 bool PublisherApp::publish()
 {
+    // printf("publish running\n");
     bool ret = false;
-    // write_randomData();
-    recived_bytes_ = udpreciver_.run(&buffer_);
-
-    // Wait for the data endpoints discovery
     std::unique_lock<std::mutex> matched_lock(mutex_);
-    cv_.wait(matched_lock, [&]()
-            {
-                // Publisher starts sending messages when enough entities have been discovered.
-                return (((matched_ >= static_cast<int16_t>(wait_)) && recived_bytes_ > 0) || is_stopped() );
-            });
-    if (!is_stopped())
+    // Wait for the data endpoints discovery
+    // cv_.wait_for(matched_lock, std::chrono::milliseconds(period_ms_), [&]()
+    //     {
+    //         return ( pause_ && (matched_ >= static_cast<int16_t>(wait_)) || is_stopped());
+    //     });
+    cv_.wait(matched_lock,[&]()
     {
-        configuration_.data(std::vector<unsigned char>(buffer_, buffer_ + strlen(buffer_)));
-        configuration_.index(configuration_.index() + 1);
-        ret = (RETCODE_OK == writer_->write(&configuration_));
+        return ((pause_ && (matched_ >= static_cast<int16_t>(wait_))) || is_stopped());
+    });
+    // std::cout << static_cast<bool>(matched_ >= static_cast<int16_t>(wait_))<< std::endl;
+    if (!is_stopped() && pause_)
+    {  
+        // lidar_data_.data(std::vector<unsigned char>(buffer_, buffer_ + strlen(buffer_)));
+        writeHeader();
+        ret = (RETCODE_OK == writer_->write(&lidar_data_));
+        packet_sum_ = 0;
+        pause_.store(false);
+        cv_.notify_one();
     }
     return ret;
+}
+
+void PublisherApp::udprun()
+{   
+    // printf("udpruning\n");
+    std::unique_lock<std::mutex> lock(mutex_);
+    while(true)
+    {
+        // if (!is_stopped())
+        // {
+            // printf("udpruning, packetnum=%d\n",packet_sum_);
+
+        if (udpreciver_.run(buffer_, 1300) == 1218) 
+        {               
+            cv_.wait(lock, [&]{ return !pause_.load() || is_stopped(); });
+            if (is_stopped()) break;
+            // std::lock_guard (mutex_,);
+            // 确保只当接收到正确数量的数据时才增加 packet_sum_
+            packet_sum_++;
+            // printf("%d /",packet_sum_.load());
+            if (packet_sum_ == 630) 
+            {
+                pause_.store(true);
+                cv_.notify_one();
+            }
+            writePacket(packet_sum_ - 1); // 处理接收到的数据包
+        } 
+        else 
+        {
+            std::cout << "Received data != 1218 bytes" << std::endl;
+        }
+        // }
+        // else
+        // {
+            // std::this_thread::sleep_for(std::chrono::milliseconds(5));
+            // break;
+        // }
+    }       
+}
+
+
+void PublisherApp::writePacket(uint32_t pk_sum_)
+{
+    int start_index;
+    int start_ch;
+    float radius;
+    float elevation;
+    float azimuth;
+
+    reverse(buffer_, 20, sizeof(uint32_t));
+    reverse(buffer_, 24, sizeof(uint32_t));
+    memcpy(&lidar_data_.lidardatadet_().packet_list()[pk_sum_].timestamp_secs(), &buffer_[20], sizeof(uint32_t));
+    // printf("%d,%x %x %x %x\n",lidar_data_.lidardatadet_().packet_list()[pk_sum_].timestamp_secs(),buffer_[20],buffer_[21],buffer_[22],buffer_[23]);
+    memcpy(&lidar_data_.lidardatadet_().packet_list()[pk_sum_].timestamp_usecs(), &buffer_[24], sizeof(uint32_t));
+    for (int i = 0; i < 25; i++ )
+    {   
+        start_index = 47 * i + 40;
+        lidar_data_.lidardatadet_().packet_list()[pk_sum_].data_block_sum() = i + 1;
+        lidar_data_.lidardatadet_().packet_list()[pk_sum_].data_block_list()[i].time_offset() = buffer_[start_index];
+        lidar_data_.lidardatadet_().packet_list()[pk_sum_].data_block_list()[i].return_seq() = buffer_[start_index + 1];
+        // memcpy(&lidar_data_.lidardatadet_().packet_list()[pk_sum_].data_block_list()[i].time_offset(), &buffer_[start], 1);
+        // memcpy(&lidar_data_.lidardatadet_().packet_list()[pk_sum_].data_block_list()[i].return_seq(), &buffer_[start + 1], 1);
+
+        for (int j = 0; j < 5; j++ )
+        {   
+            start_ch = start_index + 2 + 9 * j;
+
+            radius = float(static_cast<unsigned int>(buffer_[start_ch]) << 8 | static_cast<unsigned int>(buffer_[start_ch + 1])) * 0.005;
+            elevation = (float(static_cast<unsigned int>(buffer_[start_ch + 2]) * 256 + static_cast<unsigned int>(buffer_[start_ch + 3]))- 32768.0) * 0.01;
+            azimuth = (float(static_cast<unsigned int>(buffer_[start_ch + 3]) * 256 + static_cast<unsigned int>(buffer_[start_ch + 4]))- 32768.0) * 0.01;
+
+            lidar_data_.lidardatadet_().packet_list()[pk_sum_].data_block_list()[i].channel_data_sum() = j + 1;
+            lidar_data_.lidardatadet_().packet_list()[pk_sum_].data_block_list()[i].channel_data_list()[j].x() = radius * std::cos(elevation) * std::cos(azimuth);
+            // printf("first: %x; second: %x; last: %x; xvalue: %f \n", static_cast<unsigned int>(buffer_[start_ch + 2]),static_cast<unsigned int>(buffer_[start_ch + 3]),
+            lidar_data_.lidardatadet_().packet_list()[pk_sum_].data_block_list()[i].channel_data_list()[j].y() = radius * std::cos(elevation) * std::sin(azimuth);
+            lidar_data_.lidardatadet_().packet_list()[pk_sum_].data_block_list()[i].channel_data_list()[j].z() = radius * std::sin(elevation);         
+            lidar_data_.lidardatadet_().packet_list()[pk_sum_].data_block_list()[i].channel_data_list()[j].intensity() = buffer_[start_ch + 6];   
+            // printf("x= %.2f,y= %.2f, z= %.2f, i= %d\n",
+            // lidar_data_.lidardatadet_().packet_list()[pk_sum_].data_block_list()[i].channel_data_list()[j].x(),
+            // lidar_data_.lidardatadet_().packet_list()[pk_sum_].data_block_list()[i].channel_data_list()[j].y(),
+            // lidar_data_.lidardatadet_().packet_list()[pk_sum_].data_block_list()[i].channel_data_list()[j].z(),
+            // lidar_data_.lidardatadet_().packet_list()[pk_sum_].data_block_list()[i].channel_data_list()[j].intensity());                  
+        }
+    }
+}
+
+void PublisherApp::writeHeader()
+
+{   
+    gettimeofday(&nowUTC_,NULL);
+    cycletime_.tv_sec = nowUTC_.tv_sec - starttime_.tv_sec;
+    // memcpy(&lidar_data_.header_().seq(), &buffer_[8], sizeof(uint32_t));
+    reverse(buffer_, 20, sizeof(uint32_t));
+    reverse(buffer_, 24, sizeof(uint32_t));
+    memcpy(&lidar_data_.header_().timestamp_sec(), &buffer_[20], sizeof(uint32_t));
+    memcpy(&lidar_data_.header_().timestamp_usec(), &buffer_[24], sizeof(uint32_t));
+    // printf("%d,%x %x %x %x\n",lidar_data_.header_().timestamp_sec(),buffer_[20],buffer_[21],buffer_[22],buffer_[23]);
+    memcpy(&lidar_data_.header_().utc_timestamp_sec(), &nowUTC_.tv_sec, sizeof(int32_t));
+    // printf("%ld %d |", lidar_data_.header_().utc_timestamp_sec(),lidar_data_.header_().cycle_time());
+    memcpy(&lidar_data_.header_().cycle_time(), &cycletime_.tv_sec, sizeof(int32_t));
+    memcpy(&lidar_data_.lidardatadet_().packet_sum(),&packet_sum_, sizeof(uint16_t));
+    reverse(buffer_, 14, sizeof(uint16_t));
+    memcpy(&lidar_data_.lidardatadet_().protocol_version(), &buffer_[14], sizeof(uint16_t));
+    // printf("%x \n",lidar_data_.lidardatadet_().protocol_version());
+    lidar_data_.lidardatadet_().return_mode() = buffer_[16];
+    lidar_data_.lidardatadet_().time_sync_mode() = buffer_[17];
+    // memcpy(&lidar_data_.lidardatadet_().return_mode(), &buffer_[16], sizeof(uint8_t));
+    // memcpy(&lidar_data_.lidardatadet_().time_sync_mode(), &buffer_[17], sizeof(uint8_t));
+    // memcpy(&lidar_data_.lidardatadet_().frame_sync(), &buffer_[17], sizeof(uint8_t));
+}
+
+void PublisherApp::reverse(char* arr,int start, int len)
+{   
+    char tmp;
+    int end = start + len - 1;
+    for (int i = 0; i < (len / 2); i ++ )
+    {   
+        std::swap(arr[start], arr[end]);
+        // tmp = arr[start];
+        // arr[start] = arr[end];
+        // arr[end] = tmp;
+        start ++;
+        end --;
+    }
 }
 
 bool PublisherApp::is_stopped()
@@ -313,18 +447,17 @@ void PublisherApp::stop()
     cv_.notify_one();
 }
 
-void PublisherApp::write_randomData()
-{   
-    std::vector<uint8_t> data_(msg_size, 0);
-    uint8_t rm_number = distribution_(generator_);
-    for (uint32_t i =0; i < msg_size; i++){
-        data_[i] = rm_number;
-        rm_number = distribution_(generator_);
-    }
-    
-    configuration_.data(data_);
-}
-} // namespace configuration
+// void PublisherApp::write_randomData()
+// {   
+//     std::vector<uint8_t> data_(msg_size, 0);
+//     uint8_t rm_number = distribution_(generator_);
+//     for (uint32_t i =0; i < msg_size; i++){
+//         data_[i] = rm_number;
+//         rm_number = distribution_(generator_);
+//     }
+//     configuration_.data(data_);
+// }
+} // namespace lidar_test
 } // namespace examples
 } // namespace fastdds
 } // namespace eprosima

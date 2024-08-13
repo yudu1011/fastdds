@@ -1,24 +1,10 @@
-// Copyright 2024 Proyectos y Sistemas de Mantenimiento SL (eProsima).
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 /**
  * @file PublisherApp.hpp
  *
  */
 
-#ifndef FASTDDS_EXAMPLES_CPP_CONFIGURATION__PUBLISHERAPP_HPP
-#define FASTDDS_EXAMPLES_CPP_CONFIGURATION__PUBLISHERAPP_HPP
+#ifndef FASTDDS_EXAMPLES_CPP_LIDAR_TEST__PUBLISHERAPP_HPP
+#define FASTDDS_EXAMPLES_CPP_LIDAR_TEST__PUBLISHERAPP_HPP
 
 
 #include <condition_variable>
@@ -29,15 +15,15 @@
 
 #include "Application.hpp"
 #include "CLIParser.hpp"
-#include "Configuration.hpp"
+#include "lidardata.hpp"
 #include "UdpReciver.hpp"
 
 using namespace eprosima::fastdds::dds;
-
+using namespace Lidar;
 namespace eprosima {
 namespace fastdds {
 namespace examples {
-namespace configuration {
+namespace lidartest {
 
 class PublisherApp : public Application, public DataWriterListener
 {
@@ -79,6 +65,10 @@ public:
     //! Trigger the end of execution
     void stop() override;
 
+    void ptf();
+
+    void reverse(char* arr,int start, int len);
+
 private:
 
     //! Return the current state of execution
@@ -87,11 +77,29 @@ private:
     //! Publish a sample
     bool publish();
     
-    void write_randomData();
-    
+    // void write_randomData();
+
+    void udprun();
+
+    void writePacket(uint32_t pk_sum_);
+    void writeHeader();
+
+    timeval nowUTC_;
+    timeval cycletime_;
+    timeval starttime_;
+
     UdpReciver udpreciver_;
-    
-    Configuration configuration_;
+
+    LidarDataDetection lidar_data_;
+    Header headers_;
+    LidarDataDet lidardatadets_;
+    // Suffix suffix_;
+    Packet packets_[630];
+
+    uint32_t packet_sum_;
+
+    DataBlock datablocks_[25];
+    ChannelData chaneldatas_[5];
 
     DomainParticipant* participant_;
 
@@ -115,23 +123,25 @@ private:
     
     uint32_t msg_size;
 
-    std::mt19937 generator_;
+    // std::mt19937 generator_;
 
-    std::uniform_int_distribution<int> distribution_;   
+    // std::uniform_int_distribution<int> distribution_;   
 
     std::atomic<bool> stop_;
 
     int16_t wait_;
 
-    char* buffer_;
+    std::atomic<bool> pause_;
 
-    int16_t recived_bytes_;
+    char buffer_[1300];
+
+    // int16_t recived_bytes_;
 
 };
 
-} // namespace configuration
+} // namespace lidartest
 } // namespace examples
 } // namespace fastdds
 } // namespace eprosima
 
-#endif // FASTDDS_EXAMPLES_CPP_CONFIGURATION__PUBLISHERAPP_HPP
+#endif // FASTDDS_EXAMPLES_CPP_LIDAT_TEST__PUBLISHERAPP_HPP

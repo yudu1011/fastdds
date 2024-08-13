@@ -1,0 +1,61 @@
+module Lidar{
+    @final
+    struct Header
+    {
+        unsigned long seq;
+        unsigned long timestamp_sec;
+        unsigned long timestamp_usec;
+        unsigned long long utc_timestamp_sec;
+        octet topic[64];
+        unsigned long cycle_time;
+    };
+
+    @final
+    struct Suffix
+    {
+        octet suff[64];
+    };
+
+    @final
+    struct ChannelData
+    {
+        float x;
+        float y;
+        float z;
+        octet intensity;
+    };
+
+    struct DataBlock
+    {
+        octet time_offset;
+        octet return_seq;
+        unsigned short channel_data_sum;
+        ChannelData channel_data_list[5];
+    };
+
+    struct Packet
+    {
+        unsigned long timestamp_secs;
+        unsigned long timestamp_usecs;
+        octet laser_num;
+        unsigned short data_block_sum;  
+        DataBlock data_block_list[25];
+    };
+
+    struct LidarDataDet 
+    {
+        unsigned short protocol_version;
+        octet return_mode;
+        octet time_sync_mode;
+        octet frame_sync;
+        unsigned short packet_sum;
+        Packet packet_list[630];
+    };
+
+    struct LidarDataDetection
+    {
+        Header header_;
+        LidarDataDet lidardatadet_;
+        Suffix suffix_;
+    };
+};

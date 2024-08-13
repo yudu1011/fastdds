@@ -14,18 +14,7 @@
 
 cmake_minimum_required(VERSION 3.20)
 
-set(CMAKE_PREFIX_PATH "${CMAKE_PREFIX_PATH};/home/byd/Fast-DDS/install")
 project(fastdds_configuration_example VERSION 1 LANGUAGES CXX)
-# set(CMAKE_C_COMPILER "aarch64-linux-gnu-gcc")
-# set(CMAKE_CXX_COMPILER "aarch64-linux-gnu-g++")
-# 设置目标平台的根文件系统路径
-# set(CMAKE_SYSROOT "/path/to/your/sysroot")
-
-
-# 其他设置，例如C++标准
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
 # set(CMAKE_PREFIX_PATH "${CMAKE_PREFIX_PATH};/home/byd/Fast-DDS/install")
 # Find requirements
 if(NOT fastcdr_FOUND)
